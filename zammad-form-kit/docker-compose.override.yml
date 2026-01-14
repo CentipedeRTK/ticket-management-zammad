@@ -25,6 +25,14 @@ services:
       HELPDESK_LOGO_FILE: ${HELPDESK_LOGO_FILE:-assets/centipede-rtk-logo.png}
       HELPDESK_TERMS_URL: ${HELPDESK_TERMS_URL:-https://www.centipede-rtk.org/terms-conditions}
       HELPDESK_HOME_URL: ${HELPDESK_HOME_URL:-}
+      GRAFANA_DS_QUERY_URL: ${GRAFANA_DS_QUERY_URL:-https://gf.centipede-rtk.org/api/ds/query?ds_type=grafana-postgresql-datasource}
+      GRAFANA_ORG_ID: ${GRAFANA_ORG_ID:-7}
+      GRAFANA_DS_UID: ${GRAFANA_DS_UID:-ef4dj94eoifpcf}
+      GRAFANA_DS_ID: ${GRAFANA_DS_ID:-24}
+      GRAFANA_TIMEOUT_MS: ${GRAFANA_TIMEOUT_MS:-8000}
+      GRAFANA_AUTH_HEADER: ${GRAFANA_AUTH_HEADER:-}
+      MP_CACHE_TTL_MS: ${MP_CACHE_TTL_MS:-300000}
+
     restart: unless-stopped
 
 
@@ -37,6 +45,14 @@ services:
       ZAMMAD_GROUP: ${ZAMMAD_GROUP:-Declarations GNSS}
       NOTIFY_SENDER_EMAIL: ${NOTIFY_SENDER_EMAIL}
       NOTIFY_SENDER_NAME: ${NOTIFY_SENDER_NAME}
+      # (optionnel pour plus tard)
+#      CONFIGURE_NOTIFICATION_SMTP: ${CONFIGURE_NOTIFICATION_SMTP:-false}
+#      NOTIFY_SMTP_HOST: ${NOTIFY_SMTP_HOST}
+#      NOTIFY_SMTP_PORT: ${NOTIFY_SMTP_PORT:-587}
+#      NOTIFY_SMTP_USER: ${NOTIFY_SMTP_USER}
+#      NOTIFY_SMTP_PASSWORD: ${NOTIFY_SMTP_PASSWORD}
+#      NOTIFY_SMTP_STARTTLS: ${NOTIFY_SMTP_STARTTLS:-true}
+
     volumes:
       - ./zammad-form-kit/scripts:/scripts:ro
     command: ["/bin/sh", "/scripts/bootstrap.sh"]

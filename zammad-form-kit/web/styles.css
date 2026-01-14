@@ -52,4 +52,12 @@ button:hover{filter:brightness(.95)}
 }
 /* ===== END ADD: header logo layout ===== */
 
+.field-error{
+  margin-top:-6px;
+  margin-bottom:10px;
+  font-size:.9rem;
+  color:#b91c1c;
+  min-height:1.1em; /* évite les sauts de mise en page */
+}
+
 

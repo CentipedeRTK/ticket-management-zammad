@@ -71,6 +71,120 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadCountries();
   initMap();
   hookFiles();
+// ===== BEGIN REPLACE: mount point validation + uniqueness =====
+const mpEl = document.getElementById('mount_point');
+const mpErr = document.getElementById('mount_point_error');
+
+let mpFormatMsg = '';
+let mpUniqueMsg = '';
+let mpCheckTimer = null;
+let mpAbort = null;
+let mpLastChecked = { mp: '', is_taken: null, ts: 0 };
+
+function applyMountPointValidity({ showBubble = false } = {}) {
+  if (!mpEl) return true;
+  const msg = mpFormatMsg || mpUniqueMsg || '';
+  mpEl.setCustomValidity(msg);
+  if (mpErr) mpErr.textContent = msg;
+  if (showBubble && msg) mpEl.reportValidity();
+  return !msg;
+}
+
+function validateMountPointFormat() {
+  if (!mpEl) return true;
+
+  const raw = String(mpEl.value || '');
+  const normalized = raw.toUpperCase();
+  if (raw !== normalized) mpEl.value = normalized;
+
+  mpFormatMsg = '';
+  if (normalized.length === 0) {
+    mpFormatMsg = '';
+  } else if (!/^[A-Z0-9]*$/.test(normalized)) {
+    mpFormatMsg = '❌ Caractères autorisés : A–Z et 0–9 uniquement.';
+  } else if (normalized.length < 2) {
+    mpFormatMsg = '❌ Le mount point doit contenir au moins 2 caractères.';
+  } else if (normalized.length > 10) {
+    mpFormatMsg = '❌ Le mount point ne doit pas dépasser 10 caractères.';
+  } else {
+    mpFormatMsg = '';
+  }
+
+  // Si le format n'est pas valide, on annule la vérification d'unicité.
+  if (mpFormatMsg) {
+    mpUniqueMsg = '';
+    mpLastChecked = { mp: '', is_taken: null, ts: 0 };
+    if (mpCheckTimer) clearTimeout(mpCheckTimer);
+    mpCheckTimer = null;
+    if (mpAbort) mpAbort.abort();
+    mpAbort = null;
+  }
+
+  return applyMountPointValidity();
+}
+
+async function checkMountPointUnique({ showBubble = false, force = false } = {}) {
+  if (!mpEl) return true;
+
+  validateMountPointFormat();
+  if (mpFormatMsg) return applyMountPointValidity({ showBubble });
+
+  const mp = String(mpEl.value || '').trim().toUpperCase();
+  if (!mp) {
+    mpUniqueMsg = '';
+    return applyMountPointValidity({ showBubble });
+  }
+
+  // Éviter de re-taper le même check (sauf force).
+  if (!force && mpLastChecked.mp === mp && typeof mpLastChecked.is_taken === 'boolean') {
+    mpUniqueMsg = mpLastChecked.is_taken
+      ? '❌ Ce mount point est déjà utilisé. Choisissez-en un autre.'
+      : '';
+    return applyMountPointValidity({ showBubble });
+  }
+
+  if (mpAbort) mpAbort.abort();
+  mpAbort = new AbortController();
+
+  try {
+    const resp = await fetch(`/api/mountpoints/check?mp=${encodeURIComponent(mp)}`, {
+      method: 'GET',
+      signal: mpAbort.signal,
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data?.message || data?.detail?.message || `HTTP ${resp.status}`);
+
+    mpLastChecked = { mp, is_taken: !!data.is_taken, ts: Date.now() };
+    mpUniqueMsg = data.is_taken
+      ? '❌ Ce mount point est déjà utilisé. Choisissez-en un autre.'
+      : '';
+  } catch (err) {
+    if (err?.name === 'AbortError') return false;
+    mpLastChecked = { mp, is_taken: null, ts: Date.now() };
+    mpUniqueMsg = '❌ Impossible de vérifier si le mount point est déjà utilisé (service indisponible).';
+  }
+
+  return applyMountPointValidity({ showBubble });
+}
+
+function scheduleUniqueCheck() {
+  if (!mpEl) return;
+  validateMountPointFormat();
+  if (mpFormatMsg) return;
+
+  const mp = String(mpEl.value || '').trim().toUpperCase();
+  if (!/^[A-Z0-9]{2,10}$/.test(mp)) return;
+
+  if (mpCheckTimer) clearTimeout(mpCheckTimer);
+  mpCheckTimer = setTimeout(() => {
+    checkMountPointUnique({ showBubble: false, force: false });
+  }, 450);
+}
+
+mpEl && mpEl.addEventListener('input', scheduleUniqueCheck);
+mpEl && mpEl.addEventListener('blur', () => checkMountPointUnique({ showBubble: true, force: true }));
+// ===== END REPLACE: mount point validation + uniqueness =====
+
 
   const form = document.getElementById('gnss-form');
   const result = document.getElementById('result');
@@ -99,6 +213,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!(eh <= 20)) { result.textContent = '❌ E_H doit être ≤ 20 mm.'; form.elements['e_h'].focus(); return; }
     if (!document.getElementById('confirm_map').checked) {
       result.textContent = '❌ Veuillez confirmer la position sur la carte.'; return;
+    }
+    validateMountPointFormat();
+    if (mpFormatMsg) {
+      result.textContent = mpErr?.textContent || '❌ Mount point invalide.';
+      mpEl && mpEl.focus();
+      return;
+    }
+    const uniqueOk = await checkMountPointUnique({ showBubble: true, force: true });
+    if (!uniqueOk) {
+      result.textContent = mpErr?.textContent || '❌ Mount point invalide.';
+      mpEl && mpEl.focus();
+      return;
     }
 
     const fd = new FormData(form);
