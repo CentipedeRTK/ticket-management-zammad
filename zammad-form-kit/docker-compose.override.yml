@@ -1,0 +1,51 @@
+services:
+  form-web:
+    build:
+      context: ./zammad-form-kit
+      dockerfile: ./form-web/Dockerfile
+    ports:
+      - "${FORM_WEB_PORT:-9899}:80"
+    depends_on:
+      - form-api
+    restart: unless-stopped
+
+  form-api:
+    build:
+      context: ./zammad-form-kit/form-api
+    environment:
+      ZAMMAD_URL: ${ZAMMAD_URL:-http://zammad-nginx:8080}
+      ZAMMAD_TOKEN: ${ZAMMAD_SUBMIT_TOKEN:?Missing submit token}
+      ZAMMAD_GROUP: ${ZAMMAD_GROUP:-Declarations GNSS}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      AUTO_CREATE_ATTRS: ${AUTO_CREATE_ATTRS:-false}
+      ZAMMAD_PUBLIC_URL: ${ZAMMAD_PUBLIC_URL:-}
+      ZAMMAD_PASSWORD_RESET_URL: ${ZAMMAD_PASSWORD_RESET_URL:-}
+      HELPDESK_NAME: ${HELPDESK_NAME:-Centipede-RTK Helpdesk}
+      FRANCOPHONE_ALPHA3: ${FRANCOPHONE_ALPHA3:-}
+      HELPDESK_LOGO_FILE: ${HELPDESK_LOGO_FILE:-assets/centipede-rtk-logo.png}
+      HELPDESK_TERMS_URL: ${HELPDESK_TERMS_URL:-https://www.centipede-rtk.org/terms-conditions}
+      HELPDESK_HOME_URL: ${HELPDESK_HOME_URL:-}
+    restart: unless-stopped
+
+
+  # One-shot initializer: create the ticket group and the custom attributes then run migrations
+  zammad-bootstrap:
+    image: alpine:3.20
+    environment:
+      ZAMMAD_URL: ${ZAMMAD_URL:-http://zammad-nginx:8080}
+      ZAMMAD_TOKEN: ${ZAMMAD_ADMIN_TOKEN:?Missing admin token}
+      ZAMMAD_GROUP: ${ZAMMAD_GROUP:-Declarations GNSS}
+      NOTIFY_SENDER_EMAIL: ${NOTIFY_SENDER_EMAIL}
+      NOTIFY_SENDER_NAME: ${NOTIFY_SENDER_NAME}
+    volumes:
+      - ./zammad-form-kit/scripts:/scripts:ro
+    command: ["/bin/sh", "/scripts/bootstrap.sh"]
+    depends_on:
+      - form-api
+    restart: "no"
+    
+  zammad-nginx:
+    environment:
+      # ajuste si besoin
+      NGINX_CLIENT_MAX_BODY_SIZE: ${ZAMMAD_NGINX_MAX_BODY:-200m}
+
