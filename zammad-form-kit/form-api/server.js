@@ -136,8 +136,10 @@ function validatePayload(f) {
   const contactName = String(f.contact_name || '').trim();
   if (!contactName) throw new Error('Nom complet manquant.');
 
-  const mp = String(f.mount_point || '').trim();
-  if (!/^[A-Za-z0-9]{4}$/.test(mp)) throw new Error('Mount point invalide (4 caractères alphanumériques).');
+  const mp = String(f.mount_point || '').trim().toUpperCase();
+  if (!/^[A-Z0-9]{2,10}$/.test(mp)) {
+    throw new Error('Mount point invalide (2 à 10 caractères, uniquement A–Z et 0–9).');
+  }
 
   if (!/^[A-Z]{3}$/.test(String(f.country_alpha3 || ''))) {
     throw new Error('Code pays ISO alpha-3 manquant/incorrect.');
@@ -178,6 +180,9 @@ app.post('/api/submit', upload.any(), async (req, res) => {
     }
 
     const fields = { ...req.body };
+    // Normalisation côté serveur (défense en profondeur)
+    fields.mount_point = String(fields.mount_point || '').trim().toUpperCase();
+
 
     if (!fields.confirm_map) {
       return res.status(422).json({ ok: false, detail: { message: 'Confirmation carte requise.' } });

@@ -83,7 +83,23 @@
 
       <!-- Base GNSS -->
       <h2>Base GNSS</h2>
-      <label>Mount point (4 caractères) *<input name="mount_point" maxlength="4" required placeholder="CT00"></label>
+      <label>Mount point (2–10 caractères, A–Z/0–9) *
+        <input
+          id="mount_point"
+          name="mount_point"
+          minlength="2"
+          maxlength="10"
+          required
+          pattern="^[A-Z0-9]{2,10}$"
+          title="2 à 10 caractères, uniquement des lettres majuscules (A–Z) et des chiffres (0–9)."
+          placeholder="CT00"
+          autocomplete="off"
+          autocapitalize="characters"
+          spellcheck="false"
+        >
+      </label>
+      <div id="mount_point_error" class="field-error" aria-live="polite"></div>
+
       <label>Pays (alpha-3) * 
         <select id="country" name="country_alpha3" required>
           <option value="">Chargement…</option>

@@ -71,6 +71,40 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadCountries();
   initMap();
   hookFiles();
+  // ===== BEGIN ADD: mount point validation (2..10, A-Z/0-9) =====
+  const mpEl = document.getElementById('mount_point');
+  const mpErr = document.getElementById('mount_point_error');
+
+  function validateMountPoint({ showBubble = false } = {}) {
+    if (!mpEl) return true;
+
+    const raw = String(mpEl.value || '');
+    const normalized = raw.toUpperCase();
+    if (raw !== normalized) mpEl.value = normalized;
+
+    let msg = '';
+    if (normalized.length === 0) {
+      msg = '';
+    } else if (!/^[A-Z0-9]*$/.test(normalized)) {
+      msg = '❌ Caractères autorisés : A–Z et 0–9 uniquement.';
+    } else if (normalized.length < 2) {
+      msg = '❌ Le mount point doit contenir au moins 2 caractères.';
+    } else if (normalized.length > 10) {
+      msg = '❌ Le mount point ne doit pas dépasser 10 caractères.';
+    } else {
+      msg = '';
+    }
+
+    mpEl.setCustomValidity(msg);
+    if (mpErr) mpErr.textContent = msg;
+
+    if (showBubble && msg) mpEl.reportValidity();
+    return !msg;
+  }
+
+  mpEl && mpEl.addEventListener('input', () => validateMountPoint());
+  mpEl && mpEl.addEventListener('blur', () => validateMountPoint({ showBubble: true }));
+  // ===== END ADD: mount point validation (2..10, A-Z/0-9) =====
 
   const form = document.getElementById('gnss-form');
   const result = document.getElementById('result');
@@ -99,6 +133,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!(eh <= 20)) { result.textContent = '❌ E_H doit être ≤ 20 mm.'; form.elements['e_h'].focus(); return; }
     if (!document.getElementById('confirm_map').checked) {
       result.textContent = '❌ Veuillez confirmer la position sur la carte.'; return;
+    }
+    if (!validateMountPoint({ showBubble: true })) {
+      result.textContent = mpErr?.textContent || '❌ Mount point invalide.';
+      mpEl && mpEl.focus();
+      return;
     }
 
     const fd = new FormData(form);
