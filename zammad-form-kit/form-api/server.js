@@ -38,6 +38,21 @@ const ZAMMAD_PUBLIC_URL = String(process.env.ZAMMAD_PUBLIC_URL || '').replace(/\
 const ZAMMAD_PASSWORD_RESET_URL = String(process.env.ZAMMAD_PASSWORD_RESET_URL || '').trim();
 const HELPDESK_NAME = String(process.env.HELPDESK_NAME || 'Centipede-RTK Helpdesk').trim();
 
+// --- Vérification unicité mount point (Grafana datasource)
+// Par défaut, pointe vers l’API Grafana publique Centipede-RTK. Peut être surchargé via .env.form.
+const GRAFANA_DS_QUERY_URL = String(
+  process.env.GRAFANA_DS_QUERY_URL ||
+    'https://gf.centipede-rtk.org/api/ds/query?ds_type=grafana-postgresql-datasource',
+).trim();
+const GRAFANA_ORG_ID = String(process.env.GRAFANA_ORG_ID || '7').trim();
+const GRAFANA_DS_UID = String(process.env.GRAFANA_DS_UID || 'ef4dj94eoifpcf').trim();
+const GRAFANA_DS_ID = Number(process.env.GRAFANA_DS_ID || 24);
+const GRAFANA_TIMEOUT_MS = Number(process.env.GRAFANA_TIMEOUT_MS || 8000);
+// Optionnel: authentification Grafana (ex: "Bearer <token>" ou "Token <token>")
+const GRAFANA_AUTH_HEADER = String(process.env.GRAFANA_AUTH_HEADER || '').trim();
+// Cache en mémoire (ms) pour limiter les appels Grafana
+const MP_CACHE_TTL_MS = Number(process.env.MP_CACHE_TTL_MS || 300_000);
+
 // Optionnel: désactiver l’envoi de mail (utile en dev)
 const CONFIRM_EMAIL = String(process.env.CONFIRM_EMAIL || 'true').toLowerCase() === 'true';
 
@@ -129,6 +144,107 @@ function fmt(v, n = 3) {
   return Number.isFinite(x) ? x.toFixed(n) : String(v || '');
 }
 
+// --- Mount point uniqueness: Grafana-backed check (with in-memory cache)
+const mpCheckCache = new Map(); // mp -> { is_taken: boolean, expiresAt: number }
+
+function assertMountPoint(mp) {
+  const v = String(mp || '').trim().toUpperCase();
+  if (!/^[A-Z0-9]{2,10}$/.test(v)) {
+    const e = new Error('Mount point invalide (2 à 10 caractères, uniquement A–Z et 0–9).');
+    e.status = 422;
+    throw e;
+  }
+  return v;
+}
+
+function grafanaTableHasRows(payload) {
+  const frame = payload?.results?.A?.frames?.[0];
+  const values = frame?.data?.values;
+  // Grafana "table": values = [col1Rows[], col2Rows[], ...]
+  const firstCol = Array.isArray(values) ? values[0] : null;
+  return Array.isArray(firstCol) && firstCol.length > 0;
+}
+
+async function queryGrafana(rawSql) {
+  if (!GRAFANA_DS_QUERY_URL) {
+    const e = new Error('GRAFANA_DS_QUERY_URL manquant côté serveur.');
+    e.status = 500;
+    throw e;
+  }
+
+  const now = Date.now();
+  const payload = {
+    queries: [
+      {
+        refId: 'A',
+        datasource: { type: 'grafana-postgresql-datasource', uid: GRAFANA_DS_UID },
+        rawSql,
+        format: 'table',
+        datasourceId: GRAFANA_DS_ID,
+        intervalMs: 60000,
+        maxDataPoints: 1,
+      },
+    ],
+    from: String(now - 60_000),
+    to: String(now),
+  };
+
+  let r;
+  try {
+    r = await axios.post(GRAFANA_DS_QUERY_URL, payload, {
+      timeout: GRAFANA_TIMEOUT_MS,
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'X-Grafana-Org-Id': GRAFANA_ORG_ID,
+        ...(GRAFANA_AUTH_HEADER ? { Authorization: GRAFANA_AUTH_HEADER } : {}),
+      },
+      // Ne pas laisser Axios lever une exception sur les codes HTTP: on gère nous-mêmes.
+      validateStatus: () => true,
+    });
+  } catch (err) {
+    const e = new Error('Impossible de joindre Grafana pour vérifier les mount points.');
+    e.status = 503;
+    throw e;
+  }
+
+  if (r.status !== 200) {
+    const msg = r.data?.message || r.data?.error || `Grafana HTTP ${r.status}`;
+    const e = new Error(msg);
+    e.status = 503;
+    throw e;
+  }
+
+  return r.data;
+}
+
+async function isMountPointTaken(mp) {
+  const v = assertMountPoint(mp);
+
+  const cached = mpCheckCache.get(v);
+  if (cached && cached.expiresAt > Date.now()) return cached.is_taken;
+
+  // SAFE: v est strictement [A-Z0-9]{2,10}, pas d'injection SQL possible ici.
+  const rawSql = `SELECT 1 AS "x" FROM grafpub.antenne_mp WHERE mp = '${v}' LIMIT 1;`;
+  const data = await queryGrafana(rawSql);
+  const taken = grafanaTableHasRows(data);
+
+  mpCheckCache.set(v, { is_taken: taken, expiresAt: Date.now() + MP_CACHE_TTL_MS });
+  return taken;
+}
+
+// --- API: check mount point uniqueness
+app.get('/api/mountpoints/check', async (req, res) => {
+  try {
+    const mp = assertMountPoint(req.query.mp);
+    const taken = await isMountPointTaken(mp);
+    res.json({ ok: true, mp, is_taken: taken });
+  } catch (e) {
+    const status = e?.status || 422;
+    res.status(status).json({ ok: false, message: e?.message || 'Erreur.' });
+  }
+});
+
 function validatePayload(f) {
   const email = String(f.email || '').trim();
   if (!isEmail(email)) throw new Error('Email manquant/incorrect.');
@@ -192,6 +308,22 @@ app.post('/api/submit', upload.any(), async (req, res) => {
       validatePayload(fields);
     } catch (e) {
       return res.status(422).json({ ok: false, detail: { message: e.message } });
+    }
+
+    // --- Unicité mount point (bloquant)
+    try {
+      const taken = await isMountPointTaken(fields.mount_point);
+      if (taken) {
+        return res
+          .status(422)
+          .json({ ok: false, detail: { message: 'Mount point déjà utilisé. Choisissez-en un autre.' } });
+      }
+    } catch (e) {
+      const status = e?.status || 503;
+      return res.status(status).json({
+        ok: false,
+        detail: { message: "Impossible de vérifier si le mount point est déjà utilisé. Réessayez plus tard." },
+      });
     }
 
     const customerEmail = String(fields.email || '').trim();
