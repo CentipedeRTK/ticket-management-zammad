@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Déclaration base GNSS — CentipedeRTK</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+</head>
+<body>
+  <main class="container">
+    <header class="page-header">
+      <div class="page-title">
+        <h1>Déclarer votre base GNSS - Centipede-RTK</h1>
+        <p class="hint">Compléter le formulaire et appuyer sur "Soumettre" pour déclarer votre base GNSS sur le réseau Centipede-RTK </p>
+        <p class="hint">Vous recevrez ensuite un email avec les informations nécessaires permettant de suivre l'état de votre demande et de pouvoir dialoguer avec les administrateurs du réseau.</p>
+      </div>
+
+      <div class="page-brand">
+        <img class="brand-logo" src="centipede-rtk-logo.png" alt="Centipede-RTK">
+      </div>
+    </header>
+
+    <form id="gnss-form" enctype="multipart/form-data">
+      <!-- Déclarant -->
+      <h2>Déclarant</h2>
+      <label>Nom complet *<input name="contact_name" required></label>
+      <label>Email *<input type="email" name="email" required></label>
+      <label>Profession<input name="profession"></label>
+
+      <!-- Position géographique -->
+      <h2>Position géographique (obligatoire)</h2>
+      <div class="grid3">
+        <label>Latitude * 
+          <input id="lat" name="latitude" inputmode="decimal" required
+                 pattern="^-?\d+\.\d{8,}$"
+                 title="Nombre décimal avec au moins 8 décimales (ex. 45.99997143)"
+                 placeholder="ex: 46.12345678">
+        </label>
+
+        <label>Longitude *
+          <input id="lng" name="longitude" inputmode="decimal" required
+                 pattern="^-?\d+\.\d{8,}$"
+                 title="Nombre décimal avec au moins 8 décimales (ex. -1.21386051)"
+                 placeholder="ex: -1.12345678">
+        </label>
+
+        <label>Élévation *
+          <input id="elv" name="elevation_m" inputmode="decimal" required
+                 pattern="^-?\d+\.\d{3,}$"
+                 title="Nombre décimal avec au moins 3 décimales (ex. 65.632)"
+                 placeholder="ex: 25.123">
+        </label>
+      </div>
+
+      <div id="map-wrap">
+        <div id="map"></div>
+        <p class="map-hint">La carte reflète les coordonnées saisies.</p>
+      </div>
+
+      <div class="confirm-block">
+        <div class="confirm-text">Je confirme que le marqueur correspond à l’emplacement réel de l’antenne.</div>
+        <input id="confirm_map" type="checkbox" name="confirm_map" required /> 
+      </div>
+
+      <!-- Qualité -->
+      <h2>Qualité</h2>
+      <div class="grid3">
+        <label>E_N (mm) *
+          <input type="number" name="e_n" max="10" required>
+        </label>
+
+        <label>E_E (mm) *
+          <input type="number" name="e_e" max="10" required>
+        </label>
+
+        <label>E_H (mm) *
+          <input type="number" name="e_h" max="20" required>
+        </label>
+
+      </div>
+      <label>Epoch (optionnel)<input name="epoch" placeholder="ex: 2024-01-01T12:00:00Z"></label>
+
+      <!-- Base GNSS -->
+      <h2>Base GNSS</h2>
+      <label>Mount point (4 caractères) *<input name="mount_point" maxlength="4" required placeholder="CT00"></label>
+      <label>Pays (alpha-3) * 
+        <select id="country" name="country_alpha3" required>
+          <option value="">Chargement…</option>
+        </select>
+      </label>
+      <label>Récepteur *<input name="receiver" required></label>
+      <label>Antenne *<input name="antenna" required></label>
+
+      <!-- Pièces jointes -->
+      <h2>Pièces jointes</h2>
+      <label>Rapport (.txt / .html) <input type="file" name="report" accept=".txt,.html,text/plain,text/html"></label>
+      <label>RINEX (.obs / .rnx / .zip / .gz) <input type="file" name="rinex" accept=".obs,.rnx,.zip,.gz"></label>
+      <label>Photo 1 (jpg/png) <input type="file" name="photo1" accept=".jpg,.jpeg,.png" /></label>
+      <label>Photo 2 (jpg/png) <input type="file" name="photo2" accept=".jpg,.jpeg,.png" /></label>
+      <div id="photos-count" class="hint"></div>
+
+      <!-- Notes -->
+      <h2>Notes</h2>
+      <label><textarea name="notes" rows="4" placeholder="Informations complémentaires…"></textarea></label>
+
+      <button type="submit">Soumettre</button>
+      <p id="result"></p>
+    </form>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="app.js" defer></script>
+</body>
+</html>
+

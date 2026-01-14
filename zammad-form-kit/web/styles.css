@@ -1,0 +1,55 @@
+:root{--fg:#0f172a;--muted:#64748b;--accent:#2563eb;--bg:#f8fafc;--border:#e2e8f0}
+*{box-sizing:border-box}
+body{font-family:system-ui,ui-sans-serif,Roboto,Segoe UI,-apple-system; color:var(--fg); background:var(--bg); margin:0}
+.container{max-width:900px;margin:32px auto;padding:0 16px}
+h1{margin:0 0 8px}
+h2{margin:20px 0 10px;font-size:1.1rem}
+.hint{color:var(--muted)}
+label{display:block;margin:10px 0}
+input,select,textarea,button{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:#fff}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);border-color:transparent}
+button{background:var(--accent);color:#fff;border:none;border-radius:999px;padding:12px 16px;margin-top:12px;cursor:pointer}
+button:hover{filter:brightness(.95)}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+#result{margin-top:8px;color:var(--muted)}
+#map-wrap{margin:10px 0 6px}
+#map{height:320px;border-radius:8px;border:1px solid var(--border)}
+.map-hint{font-size:.9rem;color:var(--muted);margin-top:6px}
+.confirm-block{margin:10px 0 4px}
+.confirm-text{font-size:.98rem;margin-bottom:6px}
+#confirm_map{width:22px;height:22px;transform:scale(1.25);transform-origin:top left}
+/* ===== BEGIN ADD: header logo layout ===== */
+.page-header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+  flex-wrap:wrap;
+  margin-bottom:12px;
+}
+
+.page-title{
+  flex:1 1 520px;
+  min-width:260px;
+}
+
+.page-brand{
+  flex:0 0 auto;
+  margin-left:auto;
+}
+
+.brand-logo{
+  display:block;
+  height:52px;   /* ajuste si tu veux plus grand */
+  width:auto;    /* IMPORTANT: conserve les proportions */
+  max-width:240px;
+}
+
+/* Mobile: logo toujours visible, mais sans casser la mise en page */
+@media (max-width: 640px){
+  .brand-logo{ height:44px; max-width:100px; }
+  .page-brand{ align-self:flex-end; }
+}
+/* ===== END ADD: header logo layout ===== */
+
+
